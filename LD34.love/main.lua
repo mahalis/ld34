@@ -12,6 +12,7 @@ local targets
 
 local canonicalPathDistance
 local CANONICAL_DISTANCE_FUDGE_FACTOR = 0.7
+-- TODO: foods should be like racing-game checkpoints, giving you additional time
 
 -- debugging total distance
 local SHOW_CANONICAL_PATH = false
@@ -30,25 +31,44 @@ local TARGET_CONSUMPTION_DISTANCE = 23
 
 local GROUND_Y = 60
 
+local backgroundImage
+
 function love.load()
 	math.randomseed(os.time())
 
+	local isHighDPI = (love.window.getPixelScale() > 1)
+	backgroundImage = loadImage("background", isHighDPI)
+
 	reset()
+end
+
+function loadImage(pathName, isHighDPI) -- omit “graphics/” and “.png”
+	local desiredPath = "graphics/" .. pathName .. (isHighDPI and "@2x" or "") .. ".png"
+
+	local image = nil
+	if love.filesystem.isFile(desiredPath) then
+		image = love.graphics.newImage(desiredPath)
+	end
+
+	return image or love.graphics.newImage("graphics/" .. pathName .. ".png")
 end
 
 function love.draw()
 	
 	local w, h = love.window.getDimensions()
 
+	local pixelScale = love.window.getPixelScale()
+	love.graphics.scale(pixelScale)
+
+	local scaleMultiplier = 1 / pixelScale
+
+	love.graphics.setColor(255, 255, 255, 255)
+	love.graphics.draw(backgroundImage, 0, 0, 0, scaleMultiplier, scaleMultiplier)
 	if playing then
-
-		love.graphics.setColor(255, 255, 255, 100)
-		love.graphics.rectangle("fill", 20, 20, 100, 20)
-		love.graphics.setColor(255, 255, 255, 255)
-		love.graphics.rectangle("fill", 20, 20, 100 * progressAmount(), 20)
-
-		love.graphics.setLineWidth(1)
-		love.graphics.line(0, GROUND_Y, w, GROUND_Y)
+		love.graphics.setColor(0, 200, 0, 100)
+		love.graphics.rectangle("fill", 20, 20, 100, 10)
+		love.graphics.setColor(0, 200, 0, 255)
+		love.graphics.rectangle("fill", 20, 20, 100 * (1 - progressAmount()), 10)
 
 		if SHOW_CANONICAL_PATH then
 			love.graphics.setLineWidth(1)
@@ -75,6 +95,7 @@ function love.draw()
 		love.graphics.setLineWidth(6)
 		local positionCount = #positionHistory
 		if positionCount > 1 then
+			-- TODO: add rhythmic pulse along whole length. thickness + color?
 			local taperSegments = 50
 			for i = 2, positionCount do
 				local taperAmount = math.max(0, (i - (positionCount - taperSegments)) / taperSegments)
@@ -237,8 +258,10 @@ function love.keypressed(key)
 			isTurningLeft = false
 		end
 	else
-		-- TODO: don't allow resetting immediately after an end-game, it's too easy to miss the end-game screen
-		handleNotPlayingInteraction()
+		if key == "2" or key == "left" or key == "right" then
+			-- TODO: don't allow resetting immediately after an end-game, it's too easy to miss the end-game screen
+			handleNotPlayingInteraction()
+		end
 	end
 end
 
