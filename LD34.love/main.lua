@@ -3,20 +3,32 @@ require "vectors"
 local elapsedTime
 local playing
 local gameOver
+local won
+
+local playStartedTime
 
 local positionHistory
 local targets
 
+local canonicalPathDistance
+local CANONICAL_DISTANCE_FUDGE_FACTOR = 0.6
+
+-- debugging total distance
+local SHOW_CANONICAL_PATH = false
+local canonicalPathPositionList
+
 local isTurningLeft
 local direction
 
-local SPEED = 80
+local SPEED = 100
 local TURN_AMOUNT = 0.02
 
 local TARGET_COUNT = 7
 local TARGET_MINIMUM_WALL_DISTANCE = 80
 local TARGET_MINIMUM_TARGET_DISTANCE = 100
-local TARGET_CONSUMPTION_DISTANCE = 15
+local TARGET_CONSUMPTION_DISTANCE = 23
+
+local GROUND_Y = 60
 
 function love.load()
 	math.randomseed(os.time())
@@ -28,24 +40,57 @@ function love.draw()
 	
 	local w, h = love.window.getDimensions()
 
-	for i = 1, TARGET_COUNT do
-		local target = targets[i]
-		if target.consumed then
-			love.graphics.setColor(50, 180, 20, 255)
-		else
-			love.graphics.setColor(180, 20, 60, 255)
-		end
-		love.graphics.circle("fill", target.position.x, target.position.y, 10)
-	end
+	if playing then
 
-	love.graphics.setColor(255, 255, 255, 255)
-	love.graphics.setLineWidth(6)
-	local positionCount = #positionHistory
-	if positionCount > 1 then
-		for i = 2, positionCount do
-			local lastPosition = positionHistory[i - 1]
-			local thisPosition = positionHistory[i]
-			love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+		love.graphics.setColor(255, 255, 255, 100)
+		love.graphics.rectangle("fill", 20, 20, 100, 20)
+		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.rectangle("fill", 20, 20, 100 * progressAmount(), 20)
+
+		love.graphics.setLineWidth(1)
+		love.graphics.line(0, GROUND_Y, w, GROUND_Y)
+
+		if SHOW_CANONICAL_PATH then
+			love.graphics.setLineWidth(1)
+			for i = 2, #canonicalPathPositionList do
+				local lastPosition = canonicalPathPositionList[i - 1]
+				local thisPosition = canonicalPathPositionList[i]
+				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+			end
+		end
+
+		for i = 1, TARGET_COUNT do
+			local target = targets[i]
+			if target.consumed then
+				love.graphics.setColor(50, 180, 20, 255)
+			else
+				love.graphics.setColor(180, 20, 60, 255)
+			end
+			love.graphics.circle("fill", target.position.x, target.position.y, 20)
+		end
+
+		love.graphics.setColor(255, 255, 255, 255)
+		love.graphics.circle("fill", positionHistory[1].x, positionHistory[1].y, 10)
+		love.graphics.setLineWidth(6)
+		local positionCount = #positionHistory
+		if positionCount > 1 then
+			for i = 2, positionCount do
+				local lastPosition = positionHistory[i - 1]
+				local thisPosition = positionHistory[i]
+				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+			end
+		end
+	else
+		if not gameOver then
+			-- menu / title screen
+		else
+			if won then
+				love.graphics.setColor(0, 200, 0, 255)
+			else
+				love.graphics.setColor(200, 0, 0, 255)
+			end
+
+			love.graphics.circle("fill", w / 2, h / 2, 100)
 		end
 	end
 end
@@ -53,18 +98,31 @@ end
 function love.update(dt)
 	elapsedTime = elapsedTime + dt
 
-	local position = positionHistory[#positionHistory]
-	direction = vNorm(vAdd(direction, vMul(vRight(direction), (isTurningLeft and 1 or -1) * (TURN_AMOUNT * SPEED) * dt)))
-	position = vAdd(position, vMul(direction, SPEED * dt))
+	if playing then
+		local position = positionHistory[#positionHistory]
+		direction = vNorm(vAdd(direction, vMul(vRight(direction), (isTurningLeft and 1 or -1) * (TURN_AMOUNT * SPEED) * dt)))
+		position = vAdd(position, vMul(direction, SPEED * dt))
 
-	for i = 1, TARGET_COUNT do
-		local target = targets[i]
-		if not target.consumed and vDist(position, target.position) < TARGET_CONSUMPTION_DISTANCE then
-			target.consumed = true
+		local allTargetsConsumed = true
+		for i = 1, TARGET_COUNT do
+			local target = targets[i]
+			if not target.consumed and vDist(position, target.position) < TARGET_CONSUMPTION_DISTANCE then
+				target.consumed = true
+			end
+			allTargetsConsumed = allTargetsConsumed and target.consumed
+		end
+
+		addNewPosition(position)
+		if allTargetsConsumed == true and position.y < GROUND_Y then
+			endGame(true)
+		elseif progressAmount() > 1 then
+			endGame(false)
 		end
 	end
+end
 
-	addNewPosition(position)
+function progressAmount()
+	return (elapsedTime - playStartedTime) / (canonicalPathDistance / SPEED)
 end
 
 function reset()
@@ -75,7 +133,8 @@ function reset()
 
 	positionHistory = {}
 	local w, h = love.window.getDimensions()
-	addNewPosition(v(w * .5, h * .9))
+	local startingPosition = v(w * .5, h * .9)
+	addNewPosition(startingPosition)
 	direction = v(0,-1)
 
 	targets = {}
@@ -108,12 +167,42 @@ function reset()
 			end
 		end
 	end
+
+	local totalTargetDistance = 0
+	local lastPathPosition = startingPosition
+	local lastTargetIndex = nil
+	canonicalPathPositionList = {startingPosition}
+	for i = 1, TARGET_COUNT do
+		local index = closestUnvisitedTargetIndex(lastPathPosition, lastTargetIndex)
+		totalTargetDistance = totalTargetDistance + vDist(lastPathPosition, targets[index].position)
+		lastPathPosition = targets[index].position
+		targets[index].setupVisited = true
+		canonicalPathPositionList[#canonicalPathPositionList + 1] = lastPathPosition
+	end
+	canonicalPathDistance = totalTargetDistance * (1.0 + CANONICAL_DISTANCE_FUDGE_FACTOR)
+end
+
+function closestUnvisitedTargetIndex(position, existingTargetIndex)
+	local index = nil
+	local closestDistance = 0
+	for i = 1, #targets do
+		if (existingTargetIndex == nil or i ~= existingTargetIndex) and targets[i].setupVisited == false then
+			local distance = vDist(position, targets[i].position)
+			if index == nil or distance < closestDistance then
+				index = i
+				closestDistance = distance
+			end
+		end
+	end
+
+	return index
 end
 
 function addTarget(position)
 	local target = {}
 	target.position = position
 	target.consumed = false
+	target.setupVisited = false -- used to calculate total distance between targets
 	targets[#targets + 1] = target
 end
 
@@ -123,11 +212,13 @@ end
 
 function start()
 	playing = true
+	playStartedTime = elapsedTime
 end
 
-function endGame()
+function endGame(didWin)
 	playing = false
 	gameOver = true
+	won = didWin
 end
 
 function love.keypressed(key)
