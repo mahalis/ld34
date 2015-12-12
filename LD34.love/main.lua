@@ -11,7 +11,7 @@ local positionHistory
 local targets
 
 local canonicalPathDistance
-local CANONICAL_DISTANCE_FUDGE_FACTOR = 0.6
+local CANONICAL_DISTANCE_FUDGE_FACTOR = 0.7
 
 -- debugging total distance
 local SHOW_CANONICAL_PATH = false
@@ -71,10 +71,16 @@ function love.draw()
 
 		love.graphics.setColor(255, 255, 255, 255)
 		love.graphics.circle("fill", positionHistory[1].x, positionHistory[1].y, 10)
+
 		love.graphics.setLineWidth(6)
 		local positionCount = #positionHistory
 		if positionCount > 1 then
+			local taperSegments = 50
 			for i = 2, positionCount do
+				local taperAmount = math.max(0, (i - (positionCount - taperSegments)) / taperSegments)
+				if taperAmount > 0 then
+					love.graphics.setLineWidth(1 + 5 * (1.0 - taperAmount))
+				end
 				local lastPosition = positionHistory[i - 1]
 				local thisPosition = positionHistory[i]
 				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
@@ -222,30 +228,32 @@ function endGame(didWin)
 end
 
 function love.keypressed(key)
-	if key == "2" then
-		isTurningLeft = not isTurningLeft
-	elseif key == "left" then
-		isTurningLeft = true
-	elseif key == "right" then
-		isTurningLeft = false
+	if playing then
+		if key == "2" then
+			isTurningLeft = not isTurningLeft
+		elseif key == "left" then
+			isTurningLeft = true
+		elseif key == "right" then
+			isTurningLeft = false
+		end
+	else
+		-- TODO: don't allow resetting immediately after an end-game, it's too easy to miss the end-game screen
+		handleNotPlayingInteraction()
+	end
+end
+
+function handleNotPlayingInteraction()
+	-- TODO: allow retrying the same level, keep track of streak, etc. keyboard will do this via left/right, mouse via clicking the button or whatever
+	if gameOver then
+		reset()
+	else
+		start()
 	end
 end
 
 function love.mousepressed(x, y, button)
 	if not playing then
-		if gameOver then
-			reset()
-		else
-			start()
-		end
-	else
-		
-	end
-end
-
-function love.mousereleased(x, y, button)
-	if playing then
-		
+		handleNotPlayingInteraction()
 	end
 end
 
