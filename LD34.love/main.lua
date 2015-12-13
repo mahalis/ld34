@@ -87,7 +87,7 @@ function love.draw()
 		love.graphics.translate(0, 200 * math.pow(.5 - .5 * math.cos(math.pi * gameOverBlendFactor), 2) * (won and 1 or -1))
 	end
 	love.graphics.setColor(255, 255, 255, 255)
-	love.graphics.draw(backgroundImage, 0, 0, 0, scaleMultiplier, scaleMultiplier)
+	love.graphics.draw(backgroundImage, 0, -200, 0, scaleMultiplier, scaleMultiplier)
 	if playing or gameOver then
 		local positionCount = #positionHistory
 		if positionCount > 1 then
