@@ -39,7 +39,7 @@ local TIME_BAR_WIDTH = 200
 
 local backgroundImage
 local budImage, budDeadImage
-local foodImages
+local foodImages, foodHoleImages
 local FOOD_IMAGE_COUNT = 2
 
 local titleFont, headerFont, bodyFont, footerFont
@@ -52,8 +52,10 @@ function love.load()
 	budImage = loadImage("bud", isHighDPI)
 	budDeadImage = loadImage("bud-dead", isHighDPI)
 	foodImages = {}
+	foodHoleImages = {}
 	for i = 1, FOOD_IMAGE_COUNT do
 		foodImages[i] = loadImage("food-" .. tostring(i), isHighDPI)
+		foodHoleImages[i] = loadImage("food-" .. tostring(i) .. "-hole", isHighDPI)
 	end
 
 	local fontPath = "font/notperfect regular.ttf"
@@ -97,6 +99,14 @@ function love.draw()
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 	love.graphics.draw(backgroundImage, 0, -200, 0, scaleMultiplier, scaleMultiplier)
+
+	local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
+	love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier - .01 * gameOverBlendFactor, scaleMultiplier - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
+	if gameOver and not won then
+		love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
+		love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
+	end
+
 	if playing or gameOver then
 		local positionCount = #positionHistory
 		if positionCount > 1 then
@@ -119,25 +129,15 @@ function love.draw()
 			end
 		end
 
+		love.graphics.setColor(255, 255, 255, 255)
 		for i = 1, TARGET_COUNT do
 			local target = targets[i]
-			if target.consumed then
-				love.graphics.setColor(50, 180, 20, 255)
-			else
-				love.graphics.setColor(255, 255, 255, 255)
-			end
-			local foodImage = foodImages[target.imageIndex]
+			local foodImage = (target.consumed and foodHoleImages or foodImages)[target.imageIndex]
 			local foodImageOriginX, foodImageOriginY = foodImage:getWidth() * .5, foodImage:getHeight() * .6
 			love.graphics.draw(foodImage, target.position.x, target.position.y, 0, scaleMultiplier, scaleMultiplier, foodImageOriginX, foodImageOriginY)
 		end
 
-		local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
-		love.graphics.setColor(255, 255, 255, 255)
-		love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier - .01 * gameOverBlendFactor, scaleMultiplier - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
-		if gameOver and not won then
-			love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
-			love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
-		end
+		
 
 		-- time bar
 		if not gameOver then
