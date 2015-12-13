@@ -42,6 +42,8 @@ local budImage, budDeadImage
 local foodImages
 local FOOD_IMAGE_COUNT = 2
 
+local titleFont, headerFont, bodyFont, footerFont
+
 function love.load()
 	math.randomseed(os.time())
 
@@ -53,6 +55,12 @@ function love.load()
 	for i = 1, FOOD_IMAGE_COUNT do
 		foodImages[i] = loadImage("food-" .. tostring(i), isHighDPI)
 	end
+
+	local fontPath = "font/notperfect regular.ttf"
+	titleFont = love.graphics.newFont(fontPath, 64)
+	headerFont = love.graphics.newFont(fontPath, 40)
+	bodyFont = love.graphics.newFont(fontPath, 32)
+	footerFont = love.graphics.newFont(fontPath, 24)
 
 	reset()
 end
@@ -143,6 +151,20 @@ function love.draw()
 		end
 	else
 		-- introductory text
+		local titleText = "sprout"
+		local bodyLines = { "you are the tiny, frail beginnings of a plant", "you have strength to begin with, but it will fade", "feed yourself, reach the surface, and thrive" }
+		local footerText = "press left, right, or 2 to continue"
+		love.graphics.setFont(titleFont)
+		love.graphics.print(titleText, w / 2, 100, 0, 1, 1, titleFont:getWidth(titleText) / 2)
+
+		love.graphics.setFont(bodyFont)
+		for i = 1, #bodyLines do
+			local line = bodyLines[i]
+			love.graphics.print(line, w / 2, 200 + 60 * (i - 1), 0, 1, 1, bodyFont:getWidth(line) / 2)
+		end
+
+		love.graphics.setFont(footerFont)
+		love.graphics.print(footerText, w / 2, 400, 0, 1, 1, footerFont:getWidth(footerText) / 2)
 	end
 end
 
@@ -185,7 +207,7 @@ function reset()
 
 	positionHistory = {}
 	local w, h = love.window.getDimensions()
-	local startingPosition = v(w * .5, h * .8)
+	local startingPosition = v(w * .5, h * .85)
 	addNewPosition(startingPosition)
 	direction = v(0,-1)
 
