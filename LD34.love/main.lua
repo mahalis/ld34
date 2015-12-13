@@ -92,7 +92,7 @@ function love.load()
 
 	winStreak = 0
 
-	reset()
+	reset(false)
 end
 
 function loadImage(pathName, isHighDPI) -- omit “graphics/” and “.png”
@@ -311,7 +311,7 @@ function progressAmount()
 	return (elapsedTime - playStartedTime) / currentTimeLimit
 end
 
-function reset()
+function reset(keepCurrentTargets)
 	playing = false
 	gameOver = false
 	elapsedTime = 0
@@ -323,46 +323,55 @@ function reset()
 	addNewPosition(startingPosition)
 	direction = v(0,-1)
 
-	targets = {}
-	for i = 1, TARGET_COUNT do
-		addTarget(v(TARGET_MINIMUM_TARGET_DISTANCE + math.random() * (w - 2 * TARGET_MINIMUM_WALL_DISTANCE), TARGET_MINIMUM_TARGET_DISTANCE + math.random() * (h - 2 * TARGET_MINIMUM_WALL_DISTANCE)))
-	end
-	for relaxationStep = 1, 5 do
+	if not keepCurrentTargets then
+		targets = {}
 		for i = 1, TARGET_COUNT do
-			local originalPosition = targets[i].position
+			addTarget(v(TARGET_MINIMUM_TARGET_DISTANCE + math.random() * (w - 2 * TARGET_MINIMUM_WALL_DISTANCE), TARGET_MINIMUM_TARGET_DISTANCE + math.random() * (h - 2 * TARGET_MINIMUM_WALL_DISTANCE)))
+		end
+		for relaxationStep = 1, 5 do
+			for i = 1, TARGET_COUNT do
+				local originalPosition = targets[i].position
 
-			local closestOtherTargetIndex = nil
-			local closestOtherDistance = 0
-			for j = 1, TARGET_COUNT do
-				if i ~= j then
-					local distance = vDist(originalPosition, targets[j].position)
-					if closestOtherTargetIndex == nil or distance < closestOtherDistance then
-						closestOtherTargetIndex = j
-						closestOtherDistance = distance
+				local closestOtherTargetIndex = nil
+				local closestOtherDistance = 0
+				for j = 1, TARGET_COUNT do
+					if i ~= j then
+						local distance = vDist(originalPosition, targets[j].position)
+						if closestOtherTargetIndex == nil or distance < closestOtherDistance then
+							closestOtherTargetIndex = j
+							closestOtherDistance = distance
+						end
 					end
 				end
-			end
 
-			local closestOtherTarget = targets[closestOtherTargetIndex]
-			newPosition = originalPosition
-			if closestOtherDistance < TARGET_MINIMUM_TARGET_DISTANCE then
-				local awayMovementAmount = vNorm(vSub(originalPosition, closestOtherTarget.position), TARGET_MINIMUM_TARGET_DISTANCE - closestOtherDistance)
-				newPosition = vAdd(newPosition, awayMovementAmount)
+				local closestOtherTarget = targets[closestOtherTargetIndex]
+				local newPosition = originalPosition
+				if closestOtherDistance < TARGET_MINIMUM_TARGET_DISTANCE then
+					local awayMovementAmount = vNorm(vSub(originalPosition, closestOtherTarget.position), TARGET_MINIMUM_TARGET_DISTANCE - closestOtherDistance)
+					newPosition = vAdd(newPosition, awayMovementAmount)
+				end
+				newPosition.x = math.max(TARGET_MINIMUM_WALL_DISTANCE, math.min(w - TARGET_MINIMUM_WALL_DISTANCE, newPosition.x))
+				newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE + GROUND_Y, math.min(startingPosition.y - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
+				targets[i].position = newPosition
 			end
-			newPosition.x = math.max(TARGET_MINIMUM_WALL_DISTANCE, math.min(w - TARGET_MINIMUM_WALL_DISTANCE, newPosition.x))
-			newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE + GROUND_Y, math.min(startingPosition.y - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
-			targets[i].position = newPosition
+		end
+	else
+		for i = 1, TARGET_COUNT do
+			targets[i].setupVisited = false
+			targets[i].consumed = false
 		end
 	end
 
+	-- we don’t really have to recalculate all of this if we’re keeping the current targets, but we don’t hang on to the original time limit
 	local totalTargetDistance = 0
 	local lastPathPosition = startingPosition
 	local lastTargetIndex = nil
 	canonicalPathPositionList = {startingPosition}
 	for i = 1, TARGET_COUNT do
 		local index = closestUnvisitedTargetIndex(lastPathPosition, lastTargetIndex)
-		totalTargetDistance = totalTargetDistance + vDist(lastPathPosition, targets[index].position)
-		lastPathPosition = targets[index].position
+		local targetPosition = targets[index].position
+		totalTargetDistance = totalTargetDistance + vDist(lastPathPosition, targetPosition)
+		lastPathPosition = targetPosition
 		targets[index].setupVisited = true
 		canonicalPathPositionList[#canonicalPathPositionList + 1] = lastPathPosition
 	end
@@ -429,18 +438,13 @@ function love.keypressed(key)
 			isTurningLeft = false
 		end
 	else
-		if key == "2" or key == "left" or key == "right" and (gameOver == false or elapsedTime > gameOverTime + GAME_OVER_TRANSITION_DURATION * 1.2) then
-			handleNotPlayingInteraction()
+		if key == "2" or key == "left" or key == "right" then
+			if not gameOver then
+				start()
+			elseif elapsedTime > gameOverTime + GAME_OVER_TRANSITION_DURATION * 1.2 then
+				reset(key == "left")
+			end
 		end
-	end
-end
-
-function handleNotPlayingInteraction()
-	-- TODO: allow retrying the same level, keep track of streak, etc. keyboard will do this via left/right, mouse via clicking the button or whatever
-	if gameOver then
-		reset()
-	else
-		start()
 	end
 end
 
