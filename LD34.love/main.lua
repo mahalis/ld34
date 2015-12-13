@@ -147,17 +147,16 @@ function love.draw()
 		local titleText = "sprout"
 		local bodyLines = { "you are the tiny, frail beginnings of a plant", "you have strength to begin with, but it will fade", "feed yourself, reach the surface, and thrive" }
 		local footerText = "press left, right, or 2 to continue"
-		love.graphics.setFont(titleFont)
-		love.graphics.print(titleText, w / 2, 100, 0, 1, 1, titleFont:getWidth(titleText) / 2)
+
+		drawShadowedText(titleText, w / 2, 100, titleFont)
 
 		love.graphics.setFont(bodyFont)
 		for i = 1, #bodyLines do
 			local line = bodyLines[i]
-			love.graphics.print(line, w / 2, 200 + 60 * (i - 1), 0, 1, 1, bodyFont:getWidth(line) / 2)
+			drawShadowedText(line, w / 2, 200 + 60 * (i - 1))
 		end
 
-		love.graphics.setFont(footerFont)
-		love.graphics.print(footerText, w / 2, 400, 0, 1, 1, footerFont:getWidth(footerText) / 2)
+		drawShadowedText(footerText, w / 2, 400, footerFont)
 	end
 
 	love.graphics.setColor(255, 255, 255, 255)
@@ -167,6 +166,21 @@ function love.draw()
 		love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
 		love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
 	end
+end
+
+function drawShadowedText(text, x, y, font, alpha, shadowColor)
+	alpha = alpha or 255
+	shadowColor = shadowColor or { 0, 0, 0, 180 }
+	if font then
+		love.graphics.setFont(font)
+	else
+		font = love.graphics.getFont()
+	end
+	local textHalfWidth = font:getWidth(text) / 2
+	love.graphics.setColor(shadowColor[1], shadowColor[2], shadowColor[3], shadowColor[4] * alpha)
+	love.graphics.print(text, x, y + 2, 0, 1, 1, textHalfWidth)
+	love.graphics.setColor(255, 255, 255, alpha)
+	love.graphics.print(text, x, y, 0, 1, 1, textHalfWidth)
 end
 
 function love.update(dt)
