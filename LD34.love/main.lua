@@ -35,7 +35,7 @@ local TARGET_CONSUMPTION_DISTANCE = 30
 
 local GROUND_Y = 60
 
-local TIME_BAR_WIDTH = 200
+local TIME_BAR_WIDTH = 106
 
 local backgroundImage
 local budImage, budDeadImage
@@ -135,11 +135,11 @@ function love.draw()
 		-- time bar
 		if not gameOver then
 			love.graphics.push()
-			love.graphics.translate((w - TIME_BAR_WIDTH) / 2, h * 0.95)
-			love.graphics.setColor(0, 200, 0, 100)
-			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH, 10)
-			love.graphics.setColor(0, 200, 0, 255)
-			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH * (1 - progressAmount()), 10)
+			love.graphics.translate((w - TIME_BAR_WIDTH) / 2, h - 16)
+			love.graphics.setColor(100, 110, 120, 255)
+			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH, 6)
+			love.graphics.setColor(110, 210, 60, 255)
+			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH * (1 - progressAmount()), 6)
 			love.graphics.pop()
 		end
 	else
@@ -160,6 +160,7 @@ function love.draw()
 		love.graphics.print(footerText, w / 2, 400, 0, 1, 1, footerFont:getWidth(footerText) / 2)
 	end
 
+	love.graphics.setColor(255, 255, 255, 255)
 	local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
 	love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier - .01 * gameOverBlendFactor, scaleMultiplier - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
 	if gameOver and not won then
