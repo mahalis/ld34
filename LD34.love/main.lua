@@ -6,6 +6,9 @@ local gameOver
 local won
 
 local playStartedTime
+local gameOverTime
+
+local GAME_OVER_TRANSITION_DURATION = 1.5
 
 local positionHistory
 local targets
@@ -14,7 +17,6 @@ local currentTimeLimit
 local timeBonusPerTarget
 local TIME_LIMIT_BONUS_MULTIPLIER = 0.5 -- targets give this much; base time is the rest plus the below amount
 local TIME_LIMIT_BASE_MULTIPLIER = 0.7
--- TODO: foods should be like racing-game checkpoints, giving you additional time
 
 -- debugging total distance
 local SHOW_CANONICAL_PATH = false
@@ -36,12 +38,15 @@ local GROUND_Y = 60
 local TIME_BAR_WIDTH = 200
 
 local backgroundImage
+local budImage, budDeadImage
 
 function love.load()
 	math.randomseed(os.time())
 
 	local isHighDPI = (love.window.getPixelScale() > 1)
 	backgroundImage = loadImage("background", isHighDPI)
+	budImage = loadImage("bud", isHighDPI)
+	budDeadImage = loadImage("bud-dead", isHighDPI)
 
 	reset()
 end
@@ -66,22 +71,41 @@ function love.draw()
 
 	local scaleMultiplier = 1 / pixelScale
 
+	local lineEdgeColor = { 70, 180, 50 }
+	local lineCoreColor = { 190, 230, 60 }
+
+	local gameOverBlendFactor = 0
+	if gameOver then
+		gameOverBlendFactor = math.min(1, (elapsedTime - gameOverTime) / GAME_OVER_TRANSITION_DURATION)
+		if not won then
+			local deadLineEdgeColor = { 60, 70, 70 }
+			local deadLineCoreColor = { 150, 150, 160 }
+			lineEdgeColor = mixColorTables(lineEdgeColor, deadLineEdgeColor, gameOverBlendFactor)
+			lineCoreColor = mixColorTables(lineCoreColor, deadLineCoreColor, gameOverBlendFactor)
+		end
+
+		love.graphics.translate(0, 200 * math.pow(.5 - .5 * math.cos(math.pi * gameOverBlendFactor), 2) * (won and 1 or -1))
+	end
 	love.graphics.setColor(255, 255, 255, 255)
 	love.graphics.draw(backgroundImage, 0, 0, 0, scaleMultiplier, scaleMultiplier)
-	if playing then
-		love.graphics.push()
-		love.graphics.translate((w - TIME_BAR_WIDTH) / 2, h * 0.95)
-		love.graphics.setColor(0, 200, 0, 100)
-		love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH, 10)
-		love.graphics.setColor(0, 200, 0, 255)
-		love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH * (1 - progressAmount()), 10)
-		love.graphics.pop()
-
-		if SHOW_CANONICAL_PATH then
-			love.graphics.setLineWidth(1)
-			for i = 2, #canonicalPathPositionList do
-				local lastPosition = canonicalPathPositionList[i - 1]
-				local thisPosition = canonicalPathPositionList[i]
+	if playing or gameOver then
+		local positionCount = #positionHistory
+		if positionCount > 1 then
+			-- TODO: add rhythmic pulse along whole length. thickness + color?
+			local taperSegments = 50
+			for i = 2, positionCount do
+				local taperAmount = math.max(0, (i - (positionCount - taperSegments)) / taperSegments)
+				local baseWidth = 8
+				if taperAmount > 0 then
+					baseWidth = 2 + 6 * (1.0 - taperAmount)
+				end
+				local lastPosition = positionHistory[i - 1]
+				local thisPosition = positionHistory[i]
+				love.graphics.setLineWidth(baseWidth)
+				love.graphics.setColor(lineEdgeColor[1], lineEdgeColor[2], lineEdgeColor[3], 255)
+				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+				love.graphics.setColor(lineCoreColor[1], lineCoreColor[2], lineCoreColor[3], 255)
+				love.graphics.setLineWidth(baseWidth * .5)
 				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
 			end
 		end
@@ -96,36 +120,26 @@ function love.draw()
 			love.graphics.circle("fill", target.position.x, target.position.y, 20)
 		end
 
+		local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
 		love.graphics.setColor(255, 255, 255, 255)
-		love.graphics.circle("fill", positionHistory[1].x, positionHistory[1].y, 10)
+		love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier - .01 * gameOverBlendFactor, scaleMultiplier - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
+		if gameOver and not won then
+			love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
+			love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
+		end
 
-		love.graphics.setLineWidth(6)
-		local positionCount = #positionHistory
-		if positionCount > 1 then
-			-- TODO: add rhythmic pulse along whole length. thickness + color?
-			local taperSegments = 50
-			for i = 2, positionCount do
-				local taperAmount = math.max(0, (i - (positionCount - taperSegments)) / taperSegments)
-				if taperAmount > 0 then
-					love.graphics.setLineWidth(1 + 5 * (1.0 - taperAmount))
-				end
-				local lastPosition = positionHistory[i - 1]
-				local thisPosition = positionHistory[i]
-				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
-			end
+		-- time bar
+		if not gameOver then
+			love.graphics.push()
+			love.graphics.translate((w - TIME_BAR_WIDTH) / 2, h * 0.95)
+			love.graphics.setColor(0, 200, 0, 100)
+			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH, 10)
+			love.graphics.setColor(0, 200, 0, 255)
+			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH * (1 - progressAmount()), 10)
+			love.graphics.pop()
 		end
 	else
-		if not gameOver then
-			-- menu / title screen
-		else
-			if won then
-				love.graphics.setColor(0, 200, 0, 255)
-			else
-				love.graphics.setColor(200, 0, 0, 255)
-			end
-
-			love.graphics.circle("fill", w / 2, h / 2, 100)
-		end
+		-- introductory text
 	end
 end
 
@@ -168,7 +182,7 @@ function reset()
 
 	positionHistory = {}
 	local w, h = love.window.getDimensions()
-	local startingPosition = v(w * .5, h * .9)
+	local startingPosition = v(w * .5, h * .8)
 	addNewPosition(startingPosition)
 	direction = v(0,-1)
 
@@ -197,7 +211,7 @@ function reset()
 				local awayMovementAmount = vNorm(vSub(originalPosition, closestOtherTarget.position), TARGET_MINIMUM_TARGET_DISTANCE - closestOtherDistance)
 				local newPosition = vAdd(originalPosition, awayMovementAmount)
 				newPosition.x = math.max(TARGET_MINIMUM_WALL_DISTANCE, math.min(w - TARGET_MINIMUM_WALL_DISTANCE, newPosition.x))
-				newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE + GROUND_Y, math.min(h - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
+				newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE + GROUND_Y, math.min(startingPosition.y - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
 				targets[i].position = newPosition
 			end
 		end
@@ -256,6 +270,7 @@ end
 function endGame(didWin)
 	playing = false
 	gameOver = true
+	gameOverTime = elapsedTime
 	won = didWin
 end
 
@@ -282,12 +297,6 @@ function handleNotPlayingInteraction()
 		reset()
 	else
 		start()
-	end
-end
-
-function love.mousepressed(x, y, button)
-	if not playing then
-		handleNotPlayingInteraction()
 	end
 end
 
