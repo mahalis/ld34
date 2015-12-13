@@ -4,6 +4,7 @@ local elapsedTime
 local playing
 local gameOver
 local won
+local winStreak
 
 local playStartedTime
 local gameOverTime
@@ -64,6 +65,8 @@ function love.load()
 	bodyFont = love.graphics.newFont(fontPath, 32)
 	footerFont = love.graphics.newFont(fontPath, 24)
 
+	winStreak = 0
+
 	reset()
 end
 
@@ -87,7 +90,7 @@ function love.draw()
 
 	local gameOverBlendFactor = 0
 	if gameOver then
-		gameOverBlendFactor = math.min(1, (elapsedTime - gameOverTime) / GAME_OVER_TRANSITION_DURATION)
+		gameOverBlendFactor = 1 - math.pow(.5 + .5 * math.cos(math.pi * math.min(1, (elapsedTime - gameOverTime) / GAME_OVER_TRANSITION_DURATION)), 2)
 		if not won then
 			local deadLineEdgeColor = { 60, 70, 70 }
 			local deadLineCoreColor = { 150, 150, 160 }
@@ -95,7 +98,7 @@ function love.draw()
 			lineCoreColor = mixColorTables(lineCoreColor, deadLineCoreColor, gameOverBlendFactor)
 		end
 
-		love.graphics.translate(0, 200 * math.pow(.5 - .5 * math.cos(math.pi * gameOverBlendFactor), 2) * (won and 1 or -1))
+		love.graphics.translate(0, 200 * gameOverBlendFactor * (won and 1 or -1))
 	end
 	love.graphics.setColor(255, 255, 255, 255)
 	love.graphics.draw(backgroundImage, 0, -200, 0, scaleMultiplier, scaleMultiplier)
@@ -133,20 +136,31 @@ function love.draw()
 		end
 
 		-- time bar
-		if not gameOver then
-			love.graphics.push()
-			love.graphics.translate((w - TIME_BAR_WIDTH) / 2, h - 16)
-			love.graphics.setColor(100, 110, 120, 255)
-			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH, 6)
-			love.graphics.setColor(110, 210, 60, 255)
-			love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH * (1 - progressAmount()), 6)
-			love.graphics.pop()
+		love.graphics.push()
+		love.graphics.translate((w - TIME_BAR_WIDTH) / 2, h - 16)
+		love.graphics.setColor(100, 110, 120, 255 * (1 - gameOverBlendFactor))
+		love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH, 6)
+		love.graphics.setColor(110, 210, 60, 255 * (1 - gameOverBlendFactor))
+		love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH * (1 - progressAmount()), 6)
+		love.graphics.pop()
+
+		if gameOver then
+			if won then
+				local shadowColor = { 0, 30, 50 }
+				drawShadowedText("congratulations", w / 2, -150, headerFont, gameOverBlendFactor, shadowColor)
+				drawShadowedText("you have succeeded " .. winStreakDescription(winStreak), w / 2, -90, bodyFont, gameOverBlendFactor, shadowColor)
+				drawShadowedText("try once more?", w / 2, -30, bodyFont, gameOverBlendFactor, shadowColor)
+			else
+				drawShadowedText("alas", w / 2, 580, headerFont, gameOverBlendFactor)
+				drawShadowedText("this time, you remain in the ground", w / 2, 640, bodyFont, gameOverBlendFactor)
+				drawShadowedText("try once more?", w / 2, 700, bodyFont, gameOverBlendFactor)
+			end
 		end
 	else
 		-- introductory text
 		local titleText = "sprout"
 		local bodyLines = { "you are the tiny, frail beginnings of a plant", "you have strength to begin with, but it will fade", "feed yourself, reach the surface, and thrive" }
-		local footerText = "press left, right, or 2 to continue"
+		local footerText = "press left, right, or 2 to play"
 
 		drawShadowedText(titleText, w / 2, 100, titleFont)
 
@@ -168,18 +182,38 @@ function love.draw()
 	end
 end
 
-function drawShadowedText(text, x, y, font, alpha, shadowColor)
-	alpha = alpha or 255
-	shadowColor = shadowColor or { 0, 0, 0, 180 }
+function winStreakDescription(n)
+	if n > 99 then return tostring(n) .. " times in a row" end -- this would be straightforward but I would be astonished if anyone played enough to get that far
+
+	local numberWords = { "once", "twice", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen" }
+	local tenWords = { "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety" }
+
+	local base = nil
+	if n < 20 then
+		base = numberWords[n]
+	else
+		local ones = n % 10
+		local tens = (n - ones) / 10
+		base = tenWords[tens - 1] .. "-" .. numberWords[ones]
+	end
+
+	if n > 2 then base = base .. " times" end
+	if n > 1 then base = base .. " in a row" end
+	return base
+end
+
+function drawShadowedText(text, x, y, font, alphaMultiplier, shadowColor)
+	alphaMultiplier = alphaMultiplier or 1
+	shadowColor = shadowColor or { 0, 0, 0 }
 	if font then
 		love.graphics.setFont(font)
 	else
 		font = love.graphics.getFont()
 	end
 	local textHalfWidth = font:getWidth(text) / 2
-	love.graphics.setColor(shadowColor[1], shadowColor[2], shadowColor[3], shadowColor[4] * alpha)
+	love.graphics.setColor(shadowColor[1], shadowColor[2], shadowColor[3], 180 * math.pow(alphaMultiplier, 2))
 	love.graphics.print(text, x, y + 2, 0, 1, 1, textHalfWidth)
-	love.graphics.setColor(255, 255, 255, alpha)
+	love.graphics.setColor(255, 255, 255, 255 * alphaMultiplier)
 	love.graphics.print(text, x, y, 0, 1, 1, textHalfWidth)
 end
 
@@ -314,6 +348,11 @@ function endGame(didWin)
 	gameOver = true
 	gameOverTime = elapsedTime
 	won = didWin
+	if won then
+		winStreak = winStreak + 1
+	else
+		winStreak = 0
+	end
 end
 
 function love.keypressed(key)
@@ -326,8 +365,7 @@ function love.keypressed(key)
 			isTurningLeft = false
 		end
 	else
-		if key == "2" or key == "left" or key == "right" then
-			-- TODO: don't allow resetting immediately after an end-game, it's too easy to miss the end-game screen
+		if key == "2" or key == "left" or key == "right" and (gameOver == false or elapsedTime > gameOverTime + GAME_OVER_TRANSITION_DURATION * 1.2) then
 			handleNotPlayingInteraction()
 		end
 	end
