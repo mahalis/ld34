@@ -43,6 +43,12 @@ local budImage, budDeadImage
 local foodImages, foodHoleImages
 local FOOD_IMAGE_COUNT = 2
 
+local flowerCoreImage
+local flowerPetalImages
+local flowerPetalImageOrigins
+local flowerPetalOffsets
+local flowerPetalSequenceIndices
+
 local titleFont, headerFont, bodyFont, footerFont
 
 function love.load()
@@ -58,6 +64,22 @@ function love.load()
 		foodImages[i] = loadImage("food-" .. tostring(i), isHighDPI)
 		foodHoleImages[i] = loadImage("food-" .. tostring(i) .. "-hole", isHighDPI)
 	end
+
+	local flowerPetalImageNames = { "back", "back left", "back right", "front left", "front right", "front" } -- draw order
+	local relativePetalOrigins = { v(.44, .88), v(.82, .7), v(.15, .77), v(.85, .3), v(.1, .22), v(.46, .12) } 
+	flowerPetalImages = {}
+	flowerPetalImageOrigins = {}
+	for i = 1, #flowerPetalImageNames do
+		local petalImage = loadImage("flower " .. flowerPetalImageNames[i], isHighDPI)
+		flowerPetalImages[i] = petalImage
+		local petalWidth, petalHeight = petalImage:getWidth(), petalImage:getHeight()
+		local relativeOrigin = relativePetalOrigins[i]
+		flowerPetalImageOrigins[i] = v(relativeOrigin.x * petalWidth, relativeOrigin.y * petalHeight)
+	end
+	flowerCoreImage = loadImage("flower core", isHighDPI)
+
+	flowerPetalOffsets = { v(0, 3), nil, v(5, 3), nil, v(5, 0), v(2, 0) }
+	flowerPetalSequenceIndices = { 2, 1, 3, 0, 4, 5 }
 
 	local fontPath = "font/notperfect regular.ttf"
 	titleFont = love.graphics.newFont(fontPath, 64)
@@ -150,6 +172,24 @@ function love.draw()
 				drawShadowedText("congratulations", w / 2, -150, headerFont, gameOverBlendFactor, shadowColor)
 				drawShadowedText("you have succeeded " .. winStreakDescription(winStreak), w / 2, -90, bodyFont, gameOverBlendFactor, shadowColor)
 				drawShadowedText("try once more?", w / 2, -30, bodyFont, gameOverBlendFactor, shadowColor)
+
+				-- flower!
+				love.graphics.setColor(255, 255, 255, 255)
+				love.graphics.push()
+				local endPosition = positionHistory[#positionHistory]
+				love.graphics.translate(endPosition.x, endPosition.y)
+				local flowerGrowthTime = math.max(0, math.min(1, (elapsedTime - gameOverTime) / 1.5))
+				love.graphics.rotate(-0.4 * math.pow(1 - flowerGrowthTime, 4))
+				for i = 1, #flowerPetalImages do
+					local origin = flowerPetalImageOrigins[i]
+					local offset = flowerPetalOffsets[i] or v(0, 0)
+					local petalScale = bounceLerp(0, 1.1, 1, flowerGrowthTime, 0.1 + .05 * flowerPetalSequenceIndices[i], 0.15, 0.1)
+					love.graphics.draw(flowerPetalImages[i], offset.x - 2, offset.y + 6, 0, scaleMultiplier * petalScale, scaleMultiplier * petalScale, origin.x, origin.y)
+				end
+				local coreImageOriginX, coreImageOriginY = flowerCoreImage:getWidth() / 2, flowerCoreImage:getHeight() / 2
+				local coreScale = bounceLerp(0, 1.1, 1, flowerGrowthTime, 0, 0.3, 0.1)
+				love.graphics.draw(flowerCoreImage, 0, 0, 0, scaleMultiplier * coreScale, scaleMultiplier * coreScale, coreImageOriginX, coreImageOriginY)
+				love.graphics.pop()
 			else
 				drawShadowedText("alas", w / 2, 580, headerFont, gameOverBlendFactor)
 				drawShadowedText("this time, you remain in the ground", w / 2, 640, bodyFont, gameOverBlendFactor)
@@ -179,6 +219,16 @@ function love.draw()
 	if gameOver and not won then
 		love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
 		love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
+	end
+end
+
+function bounceLerp(startValue, midValue, endValue, time, startTime, midDuration, endDuration)
+	if time < startTime then return startValue end
+	if time > startTime + midDuration + endDuration then return endValue end
+	if time < startTime + midDuration then
+		return slerp(startValue, midValue, (time - startTime) / midDuration)
+	else
+		return slerp(midValue, endValue, (time - (startTime + midDuration)) / endDuration)
 	end
 end
 
@@ -281,13 +331,14 @@ function reset()
 			end
 
 			local closestOtherTarget = targets[closestOtherTargetIndex]
+			newPosition = originalPosition
 			if closestOtherDistance < TARGET_MINIMUM_TARGET_DISTANCE then
 				local awayMovementAmount = vNorm(vSub(originalPosition, closestOtherTarget.position), TARGET_MINIMUM_TARGET_DISTANCE - closestOtherDistance)
-				local newPosition = vAdd(originalPosition, awayMovementAmount)
-				newPosition.x = math.max(TARGET_MINIMUM_WALL_DISTANCE, math.min(w - TARGET_MINIMUM_WALL_DISTANCE, newPosition.x))
-				newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE + GROUND_Y, math.min(startingPosition.y - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
-				targets[i].position = newPosition
+				newPosition = vAdd(newPosition, awayMovementAmount)
 			end
+			newPosition.x = math.max(TARGET_MINIMUM_WALL_DISTANCE, math.min(w - TARGET_MINIMUM_WALL_DISTANCE, newPosition.x))
+			newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE + GROUND_Y, math.min(startingPosition.y - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
+			targets[i].position = newPosition
 		end
 	end
 
