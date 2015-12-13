@@ -10,8 +10,10 @@ local playStartedTime
 local positionHistory
 local targets
 
-local canonicalPathDistance
-local CANONICAL_DISTANCE_FUDGE_FACTOR = 0.7
+local currentTimeLimit
+local timeBonusPerTarget
+local TIME_LIMIT_BONUS_MULTIPLIER = 0.5 -- targets give this much; base time is the rest plus the below amount
+local TIME_LIMIT_BASE_MULTIPLIER = 0.7
 -- TODO: foods should be like racing-game checkpoints, giving you additional time
 
 -- debugging total distance
@@ -30,6 +32,8 @@ local TARGET_MINIMUM_TARGET_DISTANCE = 100
 local TARGET_CONSUMPTION_DISTANCE = 23
 
 local GROUND_Y = 60
+
+local TIME_BAR_WIDTH = 200
 
 local backgroundImage
 
@@ -65,10 +69,13 @@ function love.draw()
 	love.graphics.setColor(255, 255, 255, 255)
 	love.graphics.draw(backgroundImage, 0, 0, 0, scaleMultiplier, scaleMultiplier)
 	if playing then
+		love.graphics.push()
+		love.graphics.translate((w - TIME_BAR_WIDTH) / 2, h * 0.95)
 		love.graphics.setColor(0, 200, 0, 100)
-		love.graphics.rectangle("fill", 20, 20, 100, 10)
+		love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH, 10)
 		love.graphics.setColor(0, 200, 0, 255)
-		love.graphics.rectangle("fill", 20, 20, 100 * (1 - progressAmount()), 10)
+		love.graphics.rectangle("fill", 0, 0, TIME_BAR_WIDTH * (1 - progressAmount()), 10)
+		love.graphics.pop()
 
 		if SHOW_CANONICAL_PATH then
 			love.graphics.setLineWidth(1)
@@ -135,6 +142,7 @@ function love.update(dt)
 			local target = targets[i]
 			if not target.consumed and vDist(position, target.position) < TARGET_CONSUMPTION_DISTANCE then
 				target.consumed = true
+				currentTimeLimit = currentTimeLimit + timeBonusPerTarget
 			end
 			allTargetsConsumed = allTargetsConsumed and target.consumed
 		end
@@ -149,7 +157,7 @@ function love.update(dt)
 end
 
 function progressAmount()
-	return (elapsedTime - playStartedTime) / (canonicalPathDistance / SPEED)
+	return (elapsedTime - playStartedTime) / currentTimeLimit
 end
 
 function reset()
@@ -189,7 +197,7 @@ function reset()
 				local awayMovementAmount = vNorm(vSub(originalPosition, closestOtherTarget.position), TARGET_MINIMUM_TARGET_DISTANCE - closestOtherDistance)
 				local newPosition = vAdd(originalPosition, awayMovementAmount)
 				newPosition.x = math.max(TARGET_MINIMUM_WALL_DISTANCE, math.min(w - TARGET_MINIMUM_WALL_DISTANCE, newPosition.x))
-				newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE, math.min(h - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
+				newPosition.y = math.max(TARGET_MINIMUM_WALL_DISTANCE + GROUND_Y, math.min(h - TARGET_MINIMUM_WALL_DISTANCE, newPosition.y))
 				targets[i].position = newPosition
 			end
 		end
@@ -206,7 +214,10 @@ function reset()
 		targets[index].setupVisited = true
 		canonicalPathPositionList[#canonicalPathPositionList + 1] = lastPathPosition
 	end
-	canonicalPathDistance = totalTargetDistance * (1.0 + CANONICAL_DISTANCE_FUDGE_FACTOR)
+
+	local totalTravelTime = totalTargetDistance / SPEED
+	timeBonusPerTarget = (totalTravelTime / TARGET_COUNT) * (TIME_LIMIT_BONUS_MULTIPLIER)
+	currentTimeLimit = totalTravelTime * ((1 - TIME_LIMIT_BONUS_MULTIPLIER) + TIME_LIMIT_BASE_MULTIPLIER)
 end
 
 function closestUnvisitedTargetIndex(position, existingTargetIndex)
