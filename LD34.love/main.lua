@@ -10,6 +10,7 @@ local playStartedTime
 local gameOverTime
 
 local GAME_OVER_TRANSITION_DURATION = 1.5
+local GAME_OVER_GROWTH_TIME = 1
 
 local positionHistory
 local targets
@@ -18,6 +19,8 @@ local currentTimeLimit
 local timeBonusPerTarget
 local TIME_LIMIT_BONUS_MULTIPLIER = 0.5 -- targets give this much; base time is the rest plus the below amount
 local TIME_LIMIT_BASE_MULTIPLIER = 0.7
+
+local OFF_SCREEN_EDGE_THRESHOLD = 40
 
 -- debugging total distance
 local SHOW_CANONICAL_PATH = false
@@ -270,26 +273,36 @@ end
 function love.update(dt)
 	elapsedTime = elapsedTime + dt
 
-	if playing then
+	local finalMovementAmount = 0
+	if not playing and won then
+		finalMovementAmount = (elapsedTime - gameOverTime) / GAME_OVER_GROWTH_TIME
+	end
+	if (playing or (gameOver and won)) and finalMovementAmount < 1 then
 		local position = positionHistory[#positionHistory]
-		direction = vNorm(vAdd(direction, vMul(vRight(direction), (isTurningLeft and 1 or -1) * (TURN_AMOUNT * SPEED) * dt)))
-		position = vAdd(position, vMul(direction, SPEED * dt))
+		local speed = SPEED * (1 - finalMovementAmount)
 
-		local allTargetsConsumed = true
-		for i = 1, TARGET_COUNT do
-			local target = targets[i]
-			if not target.consumed and vDist(position, target.position) < TARGET_CONSUMPTION_DISTANCE then
-				target.consumed = true
-				currentTimeLimit = currentTimeLimit + timeBonusPerTarget
-			end
-			allTargetsConsumed = allTargetsConsumed and target.consumed
-		end
-
+		direction = vNorm(vAdd(direction, vMul(vRight(direction), (isTurningLeft and 1 or -1) * (TURN_AMOUNT * speed) * dt)))
+		position = vAdd(position, vMul(direction, speed * dt))
 		addNewPosition(position)
-		if allTargetsConsumed == true and position.y < GROUND_Y then
-			endGame(true)
-		elseif progressAmount() > 1 then
-			endGame(false)
+
+		if playing then
+			local allTargetsConsumed = true
+			for i = 1, TARGET_COUNT do
+				local target = targets[i]
+				if not target.consumed and vDist(position, target.position) < TARGET_CONSUMPTION_DISTANCE then
+					target.consumed = true
+					currentTimeLimit = currentTimeLimit + timeBonusPerTarget
+				end
+				allTargetsConsumed = allTargetsConsumed and target.consumed
+			end
+
+			if allTargetsConsumed == true and position.y < GROUND_Y then
+				endGame(true)
+			elseif progressAmount() > 1 or position.x < -OFF_SCREEN_EDGE_THRESHOLD or position.x > love.window.getWidth() + OFF_SCREEN_EDGE_THRESHOLD or position.y > love.window.getHeight() + OFF_SCREEN_EDGE_THRESHOLD then
+				endGame(false)
+			end
+		else
+			if direction.y > -.5 then isTurningLeft = not isTurningLeft end
 		end
 	end
 end
