@@ -13,7 +13,12 @@ local GAME_OVER_TRANSITION_DURATION = 1.5
 local GAME_OVER_GROWTH_TIME = 1
 
 local positionHistory
+local branchHistory
 local targets
+
+local BRANCH_LENGTH_MIN = 20
+local BRANCH_LENGTH_MAX = 50
+local BRANCH_CURVATURE = 0.015
 
 local currentTimeLimit
 local timeBonusPerTarget
@@ -136,6 +141,26 @@ function love.draw()
 			local foodImageOriginX, foodImageOriginY = foodImage:getWidth() * .5, foodImage:getHeight() * .6
 			local foodScale = (target.consumed and 1 or (1 + math.max(0, math.sin(math.pi * (elapsedTime * 2 + target.pulsePhase))) * 0.05))
 			love.graphics.draw(foodImage, target.position.x, target.position.y, target.tilt * 0.2, scaleMultiplier * foodScale, scaleMultiplier * foodScale, foodImageOriginX, foodImageOriginY)
+		end
+
+		-- TODO: switch both main path and branches to draw full thick line before thin line (avoid visible segmentation)
+
+		-- branches
+		for i = 1, #branchHistory do
+			local branch = branchHistory[i]
+			local branchPath = branch.path
+			for j = 2, #branchPath do
+				local baseWidth = 6
+				local lastPosition = branchPath[j - 1]
+				local thisPosition = branchPath[j]
+
+				love.graphics.setLineWidth(baseWidth)
+				love.graphics.setColor(lineEdgeColor[1], lineEdgeColor[2], lineEdgeColor[3], 255)
+				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+				love.graphics.setColor(lineCoreColor[1], lineCoreColor[2], lineCoreColor[3], 255)
+				love.graphics.setLineWidth(baseWidth * .5)
+				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+			end
 		end
 
 		-- main line
@@ -318,6 +343,7 @@ function reset(keepCurrentTargets)
 	isTurningLeft = (math.random() > 0.5) and true or false
 
 	positionHistory = {}
+	branchHistory = {}
 	local w, h = love.window.getDimensions()
 	local startingPosition = v(w * .5, h * .85)
 	addNewPosition(startingPosition)
@@ -429,14 +455,37 @@ function endGame(didWin)
 	end
 end
 
+function changeTurn(newTurn)
+	if newTurn ~= isTurningLeft then
+		local branchInfo = {}
+		branchInfo.time = elapsedTime
+
+		local branchSegmentLength = 4
+		local branchLength = BRANCH_LENGTH_MIN + math.random() * (BRANCH_LENGTH_MAX - BRANCH_LENGTH_MIN)
+		local branchDirection = direction
+		local branchPath = { positionHistory[#positionHistory] }
+
+		for i = 2, math.ceil(branchLength / branchSegmentLength) do
+			branchDirection = vNorm(vAdd(branchDirection, vMul(vRight(branchDirection), (isTurningLeft and 1 or -1) * (BRANCH_CURVATURE * branchSegmentLength))))
+			branchPath[i] = vAdd(branchPath[i - 1], vMul(branchDirection, branchSegmentLength))
+		end
+		branchInfo.path = branchPath
+
+		branchHistory[#branchHistory + 1] = branchInfo
+
+
+		isTurningLeft = newTurn
+	end
+end
+
 function love.keypressed(key)
 	if playing then
 		if key == "2" then
-			isTurningLeft = not isTurningLeft
+			changeTurn(not isTurningLeft)
 		elseif key == "left" then
-			isTurningLeft = true
+			changeTurn(true)
 		elseif key == "right" then
-			isTurningLeft = false
+			changeTurn(false)
 		end
 	else
 		if key == "2" or key == "left" or key == "right" then
