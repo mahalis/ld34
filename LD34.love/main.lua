@@ -31,7 +31,7 @@ local TURN_AMOUNT = 0.02
 local TARGET_COUNT = 7
 local TARGET_MINIMUM_WALL_DISTANCE = 80
 local TARGET_MINIMUM_TARGET_DISTANCE = 100
-local TARGET_CONSUMPTION_DISTANCE = 23
+local TARGET_CONSUMPTION_DISTANCE = 30
 
 local GROUND_Y = 60
 
@@ -39,6 +39,8 @@ local TIME_BAR_WIDTH = 200
 
 local backgroundImage
 local budImage, budDeadImage
+local foodImages
+local FOOD_IMAGE_COUNT = 2
 
 function love.load()
 	math.randomseed(os.time())
@@ -47,6 +49,10 @@ function love.load()
 	backgroundImage = loadImage("background", isHighDPI)
 	budImage = loadImage("bud", isHighDPI)
 	budDeadImage = loadImage("bud-dead", isHighDPI)
+	foodImages = {}
+	for i = 1, FOOD_IMAGE_COUNT do
+		foodImages[i] = loadImage("food-" .. tostring(i), isHighDPI)
+	end
 
 	reset()
 end
@@ -54,12 +60,7 @@ end
 function loadImage(pathName, isHighDPI) -- omit “graphics/” and “.png”
 	local desiredPath = "graphics/" .. pathName .. (isHighDPI and "@2x" or "") .. ".png"
 
-	local image = nil
-	if love.filesystem.isFile(desiredPath) then
-		image = love.graphics.newImage(desiredPath)
-	end
-
-	return image or love.graphics.newImage("graphics/" .. pathName .. ".png")
+	return love.graphics.newImage(desiredPath)
 end
 
 function love.draw()
@@ -115,9 +116,11 @@ function love.draw()
 			if target.consumed then
 				love.graphics.setColor(50, 180, 20, 255)
 			else
-				love.graphics.setColor(180, 20, 60, 255)
+				love.graphics.setColor(255, 255, 255, 255)
 			end
-			love.graphics.circle("fill", target.position.x, target.position.y, 20)
+			local foodImage = foodImages[target.imageIndex]
+			local foodImageOriginX, foodImageOriginY = foodImage:getWidth() * .5, foodImage:getHeight() * .6
+			love.graphics.draw(foodImage, target.position.x, target.position.y, 0, scaleMultiplier, scaleMultiplier, foodImageOriginX, foodImageOriginY)
 		end
 
 		local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
@@ -255,6 +258,7 @@ function addTarget(position)
 	target.position = position
 	target.consumed = false
 	target.setupVisited = false -- used to calculate total distance between targets
+	target.imageIndex = math.random(FOOD_IMAGE_COUNT)
 	targets[#targets + 1] = target
 end
 
