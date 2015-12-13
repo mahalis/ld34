@@ -102,7 +102,6 @@ function loadImage(pathName, isHighDPI) -- omit “graphics/” and “.png”
 end
 
 function love.draw()
-	
 	local w, h = love.window.getDimensions()
 
 	local pixelScale = love.window.getPixelScale()
@@ -135,7 +134,8 @@ function love.draw()
 			local target = targets[i]
 			local foodImage = (target.consumed and foodHoleImages or foodImages)[target.imageIndex]
 			local foodImageOriginX, foodImageOriginY = foodImage:getWidth() * .5, foodImage:getHeight() * .6
-			love.graphics.draw(foodImage, target.position.x, target.position.y, target.tilt * 0.2, scaleMultiplier, scaleMultiplier, foodImageOriginX, foodImageOriginY)
+			local foodScale = (target.consumed and 1 or (1 + math.max(0, math.sin(math.pi * (elapsedTime * 2 + target.pulsePhase))) * 0.05))
+			love.graphics.draw(foodImage, target.position.x, target.position.y, target.tilt * 0.2, scaleMultiplier * foodScale, scaleMultiplier * foodScale, foodImageOriginX, foodImageOriginY)
 		end
 
 		-- main line
@@ -404,6 +404,7 @@ function addTarget(position)
 	target.setupVisited = false -- used to calculate total distance between targets
 	target.imageIndex = math.random(FOOD_IMAGE_COUNT)
 	target.tilt = math.random() * 2 - 1
+	target.pulsePhase = math.random()
 	targets[#targets + 1] = target
 end
 
