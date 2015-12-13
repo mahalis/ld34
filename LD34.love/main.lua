@@ -100,14 +100,17 @@ function love.draw()
 	love.graphics.setColor(255, 255, 255, 255)
 	love.graphics.draw(backgroundImage, 0, -200, 0, scaleMultiplier, scaleMultiplier)
 
-	local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
-	love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier - .01 * gameOverBlendFactor, scaleMultiplier - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
-	if gameOver and not won then
-		love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
-		love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
-	end
-
 	if playing or gameOver then
+		-- foods
+		love.graphics.setColor(255, 255, 255, 255)
+		for i = 1, TARGET_COUNT do
+			local target = targets[i]
+			local foodImage = (target.consumed and foodHoleImages or foodImages)[target.imageIndex]
+			local foodImageOriginX, foodImageOriginY = foodImage:getWidth() * .5, foodImage:getHeight() * .6
+			love.graphics.draw(foodImage, target.position.x, target.position.y, 0, scaleMultiplier, scaleMultiplier, foodImageOriginX, foodImageOriginY)
+		end
+
+		-- main line
 		local positionCount = #positionHistory
 		if positionCount > 1 then
 			-- TODO: add rhythmic pulse along whole length. thickness + color?
@@ -128,16 +131,6 @@ function love.draw()
 				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
 			end
 		end
-
-		love.graphics.setColor(255, 255, 255, 255)
-		for i = 1, TARGET_COUNT do
-			local target = targets[i]
-			local foodImage = (target.consumed and foodHoleImages or foodImages)[target.imageIndex]
-			local foodImageOriginX, foodImageOriginY = foodImage:getWidth() * .5, foodImage:getHeight() * .6
-			love.graphics.draw(foodImage, target.position.x, target.position.y, 0, scaleMultiplier, scaleMultiplier, foodImageOriginX, foodImageOriginY)
-		end
-
-		
 
 		-- time bar
 		if not gameOver then
@@ -165,6 +158,13 @@ function love.draw()
 
 		love.graphics.setFont(footerFont)
 		love.graphics.print(footerText, w / 2, 400, 0, 1, 1, footerFont:getWidth(footerText) / 2)
+	end
+
+	local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
+	love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier - .01 * gameOverBlendFactor, scaleMultiplier - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
+	if gameOver and not won then
+		love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
+		love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
 	end
 end
 
