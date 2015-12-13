@@ -172,7 +172,7 @@ function love.draw()
 		if gameOver then
 			if won then
 				local shadowColor = { 0, 30, 50 }
-				drawShadowedText("congratulations", w / 2, -150, headerFont, gameOverBlendFactor, shadowColor)
+				drawShadowedText("congratulations", w / 2, -160, headerFont, gameOverBlendFactor, shadowColor)
 				drawShadowedText("you have succeeded " .. winStreakDescription(winStreak), w / 2, -90, bodyFont, gameOverBlendFactor, shadowColor)
 				drawShadowedText("try once more?", w / 2, -30, bodyFont, gameOverBlendFactor, shadowColor)
 
@@ -196,7 +196,7 @@ function love.draw()
 			else
 				drawShadowedText("alas", w / 2, 580, headerFont, gameOverBlendFactor)
 				drawShadowedText("this time, you remain in the ground", w / 2, 640, bodyFont, gameOverBlendFactor)
-				drawShadowedText("try once more?", w / 2, 700, bodyFont, gameOverBlendFactor)
+				drawShadowedText("press left to retry this level, or right for a new one", w / 2, 700, footerFont, gameOverBlendFactor)
 			end
 		end
 	else
