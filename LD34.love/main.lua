@@ -39,7 +39,7 @@ local TURN_AMOUNT = 0.02
 
 local TARGET_COUNT = 7
 local TARGET_MINIMUM_WALL_DISTANCE = 80
-local TARGET_MINIMUM_TARGET_DISTANCE = 100
+local TARGET_MINIMUM_TARGET_DISTANCE = 90
 local TARGET_CONSUMPTION_DISTANCE = 30
 
 local GROUND_Y = 60
@@ -58,6 +58,8 @@ local flowerPetalOffsets
 local flowerPetalSequenceIndices
 
 local titleFont, headerFont, bodyFont, footerFont
+
+local winSound, foodSound, loseSound, backgroundMusic
 
 function love.load()
 	math.randomseed(os.time())
@@ -94,6 +96,13 @@ function love.load()
 	headerFont = love.graphics.newFont(fontPath, 40)
 	bodyFont = love.graphics.newFont(fontPath, 32)
 	footerFont = love.graphics.newFont(fontPath, 24)
+
+	winSound = love.audio.newSource("sound/win.wav", "static")
+	foodSound = love.audio.newSource("sound/food.wav", "static")
+	loseSound = love.audio.newSource("sound/lose.wav", "static")
+	backgroundMusic = love.audio.newSource("sound/background.mp3")
+	backgroundMusic:setLooping(true)
+	backgroundMusic:play()
 
 	winStreak = 0
 
@@ -320,6 +329,8 @@ function love.update(dt)
 				local target = targets[i]
 				if not target.consumed and vDist(position, target.position) < TARGET_CONSUMPTION_DISTANCE then
 					target.consumed = true
+					foodSound:rewind()
+					foodSound:play()
 					currentTimeLimit = currentTimeLimit + timeBonusPerTarget
 				end
 				allTargetsConsumed = allTargetsConsumed and target.consumed
@@ -453,8 +464,10 @@ function endGame(didWin)
 	gameOverTime = elapsedTime
 	won = didWin
 	if won then
+		winSound:play()
 		winStreak = winStreak + 1
 	else
+		loseSound:play()
 		winStreak = 0
 	end
 end
@@ -496,7 +509,7 @@ function love.keypressed(key)
 			if not gameOver then
 				start()
 			elseif elapsedTime > gameOverTime + GAME_OVER_TRANSITION_DURATION * 1.2 then
-				reset(key == "left")
+				reset(key == "left" and not won)
 			end
 		end
 	end
