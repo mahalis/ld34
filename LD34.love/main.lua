@@ -16,9 +16,9 @@ local positionHistory
 local branchHistory
 local targets
 
-local BRANCH_LENGTH_MIN = 20
-local BRANCH_LENGTH_MAX = 50
-local BRANCH_CURVATURE = 0.015
+local BRANCH_LENGTH_MIN = 30
+local BRANCH_LENGTH_MAX = 60
+local BRANCH_CURVATURE = 0.01
 
 local currentTimeLimit
 local timeBonusPerTarget
@@ -149,17 +149,21 @@ function love.draw()
 		for i = 1, #branchHistory do
 			local branch = branchHistory[i]
 			local branchPath = branch.path
-			for j = 2, #branchPath do
-				local baseWidth = 6
-				local lastPosition = branchPath[j - 1]
-				local thisPosition = branchPath[j]
+			local branchSegmentCount = #branchPath
+			local branchTime = 1 - math.pow(1 - math.min(1, (elapsedTime - branch.time) / 1.2), 3)
+			for j = 2, branchSegmentCount do
+				local baseWidth = 7 * (branchTime - (j / branchSegmentCount))
+				if baseWidth > 0.1 then
+					local lastPosition = branchPath[j - 1]
+					local thisPosition = branchPath[j]
 
-				love.graphics.setLineWidth(baseWidth)
-				love.graphics.setColor(lineEdgeColor[1], lineEdgeColor[2], lineEdgeColor[3], 255)
-				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
-				love.graphics.setColor(lineCoreColor[1], lineCoreColor[2], lineCoreColor[3], 255)
-				love.graphics.setLineWidth(baseWidth * .5)
-				love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+					love.graphics.setLineWidth(baseWidth)
+					love.graphics.setColor(lineEdgeColor[1], lineEdgeColor[2], lineEdgeColor[3], 255)
+					love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+					love.graphics.setColor(lineCoreColor[1], lineCoreColor[2], lineCoreColor[3], 255)
+					love.graphics.setLineWidth(baseWidth * .5)
+					love.graphics.line(lastPosition.x, lastPosition.y, thisPosition.x, thisPosition.y)
+				end
 			end
 		end
 
@@ -460,7 +464,7 @@ function changeTurn(newTurn)
 		local branchInfo = {}
 		branchInfo.time = elapsedTime
 
-		local branchSegmentLength = 4
+		local branchSegmentLength = 1
 		local branchLength = BRANCH_LENGTH_MIN + math.random() * (BRANCH_LENGTH_MAX - BRANCH_LENGTH_MIN)
 		local branchDirection = direction
 		local branchPath = { positionHistory[#positionHistory] }
