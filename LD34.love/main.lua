@@ -36,6 +36,7 @@ local direction
 
 local SPEED = 100
 local TURN_AMOUNT = 0.02
+local STREAK_SPEED_INCREASE_FACTOR = 20
 
 local TARGET_COUNT = 7
 local TARGET_MINIMUM_WALL_DISTANCE = 80
@@ -335,6 +336,7 @@ function love.update(dt)
 	if (playing or (gameOver and won)) and finalMovementAmount < 1 then
 		local position = positionHistory[#positionHistory]
 		local speed = SPEED * (1 - finalMovementAmount)
+		speed = speed + STREAK_SPEED_INCREASE_FACTOR * winStreak
 
 		direction = vNorm(vAdd(direction, vMul(vRight(direction), (isTurningLeft and 1 or -1) * (TURN_AMOUNT * speed) * dt)))
 		position = vAdd(position, vMul(direction, speed * dt))
