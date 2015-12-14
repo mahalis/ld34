@@ -57,6 +57,9 @@ local flowerPetalImageOrigins
 local flowerPetalOffsets
 local flowerPetalSequenceIndices
 
+local foodParticleImage
+local FOOD_PARTICLE_COUNT = 29
+
 local titleFont, headerFont, bodyFont, footerFont
 
 local winSound, foodSound, loseSound, backgroundMusic
@@ -90,6 +93,8 @@ function love.load()
 
 	flowerPetalOffsets = { v(0, 3), nil, v(5, 3), nil, v(5, 0), v(2, 0) }
 	flowerPetalSequenceIndices = { 2, 1, 3, 0, 4, 5 }
+
+	foodParticleImage = loadImage("food particle", isHighDPI)
 
 	local fontPath = "font/notperfect regular.ttf"
 	titleFont = love.graphics.newFont(fontPath, 64)
@@ -150,6 +155,9 @@ function love.draw()
 			local foodImageOriginX, foodImageOriginY = foodImage:getWidth() * .5, foodImage:getHeight() * .6
 			local foodScale = (target.consumed and 1 or (1 + math.max(0, math.sin(math.pi * (elapsedTime * 2 + target.pulsePhase))) * 0.05))
 			love.graphics.draw(foodImage, target.position.x, target.position.y, target.tilt * 0.2, scaleMultiplier * foodScale, scaleMultiplier * foodScale, foodImageOriginX, foodImageOriginY)
+			if target.consumed then
+				love.graphics.draw(target.emitter, target.position.x, target.position.y, 0, scaleMultiplier, scaleMultiplier)
+			end
 		end
 
 		-- TODO: switch both main path and branches to draw full thick line before thin line (avoid visible segmentation)
@@ -329,6 +337,7 @@ function love.update(dt)
 				local target = targets[i]
 				if not target.consumed and vDist(position, target.position) < TARGET_CONSUMPTION_DISTANCE then
 					target.consumed = true
+					target.emitter:emit(FOOD_PARTICLE_COUNT)
 					foodSound:rewind()
 					foodSound:play()
 					currentTimeLimit = currentTimeLimit + timeBonusPerTarget
@@ -344,6 +353,10 @@ function love.update(dt)
 		else
 			if direction.y > -.5 then isTurningLeft = not isTurningLeft end
 		end
+	end
+
+	for i = 1, TARGET_COUNT do
+		targets[i].emitter:update(dt)
 	end
 end
 
@@ -446,6 +459,17 @@ function addTarget(position)
 	target.imageIndex = math.random(FOOD_IMAGE_COUNT)
 	target.tilt = math.random() * 2 - 1
 	target.pulsePhase = math.random()
+
+	local emitter = love.graphics.newParticleSystem(foodParticleImage, FOOD_PARTICLE_COUNT)
+	emitter:setParticleLifetime(.1, .3)
+	emitter:setSizes(.6, 1, 0)
+	emitter:setSizeVariation(.2)
+	emitter:setSpeed(100, 200)
+	emitter:setSpread(math.pi * 2)
+	emitter:setLinearDamping(0)
+	emitter:setAreaSpread("normal", 12, 10)
+	target.emitter = emitter
+
 	targets[#targets + 1] = target
 end
 
