@@ -60,6 +60,8 @@ local flowerPetalSequenceIndices
 local foodParticleImage
 local FOOD_PARTICLE_COUNT = 29
 
+local sunGlowImage
+
 local titleFont, headerFont, bodyFont, footerFont
 
 local winSound, foodSound, loseSound, backgroundMusic
@@ -95,6 +97,8 @@ function love.load()
 	flowerPetalSequenceIndices = { 2, 1, 3, 0, 4, 5 }
 
 	foodParticleImage = loadImage("food particle", isHighDPI)
+
+	sunGlowImage = loadImage("sun glow", isHighDPI)
 
 	local fontPath = "font/notperfect regular.ttf"
 	titleFont = love.graphics.newFont(fontPath, 64)
@@ -217,15 +221,15 @@ function love.draw()
 
 		if gameOver then
 			if won then
-				local shadowColor = { 0, 30, 50 }
-				drawShadowedText("congratulations", w / 2, -160, headerFont, gameOverBlendFactor, shadowColor)
-				drawShadowedText("you have succeeded " .. winStreakDescription(winStreak), w / 2, -90, bodyFont, gameOverBlendFactor, shadowColor)
-				drawShadowedText("try once more?", w / 2, -30, bodyFont, gameOverBlendFactor, shadowColor)
+				local endPosition = positionHistory[#positionHistory]
+
+				-- sun
+				love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
+				love.graphics.draw(sunGlowImage, endPosition.x, -200, 0, scaleMultiplier, scaleMultiplier, sunGlowImage:getWidth() / 2, 0)
 
 				-- flower!
 				love.graphics.setColor(255, 255, 255, 255)
 				love.graphics.push()
-				local endPosition = positionHistory[#positionHistory]
 				love.graphics.translate(endPosition.x, endPosition.y)
 				local flowerGrowthTime = math.max(0, math.min(1, (elapsedTime - gameOverTime) / 1.5))
 				love.graphics.rotate(-0.4 * math.pow(1 - flowerGrowthTime, 4))
@@ -239,6 +243,11 @@ function love.draw()
 				local coreScale = bounceLerp(0, 1.1, 1, flowerGrowthTime, 0, 0.3, 0.1)
 				love.graphics.draw(flowerCoreImage, 0, 0, 0, scaleMultiplier * coreScale, scaleMultiplier * coreScale, coreImageOriginX, coreImageOriginY)
 				love.graphics.pop()
+
+				local shadowColor = { 0, 30, 50 }
+				drawShadowedText("congratulations", w / 2, -160, headerFont, gameOverBlendFactor, shadowColor)
+				drawShadowedText("you have succeeded " .. winStreakDescription(winStreak), w / 2, -90, bodyFont, gameOverBlendFactor, shadowColor)
+				drawShadowedText("try once more?", w / 2, -30, bodyFont, gameOverBlendFactor, shadowColor)
 			else
 				drawShadowedText("alas", w / 2, 580, headerFont, gameOverBlendFactor)
 				drawShadowedText("this time, you remain in the ground", w / 2, 640, bodyFont, gameOverBlendFactor)
