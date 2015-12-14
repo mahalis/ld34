@@ -25,11 +25,7 @@ local timeBonusPerTarget
 local TIME_LIMIT_BONUS_MULTIPLIER = 0.5 -- targets give this much; base time is the rest plus the below amount
 local TIME_LIMIT_BASE_MULTIPLIER = 0.7
 
-local OFF_SCREEN_EDGE_THRESHOLD = 40
-
--- debugging total distance
-local SHOW_CANONICAL_PATH = false
-local canonicalPathPositionList
+local OFF_SCREEN_EDGE_THRESHOLD = 60
 
 local isTurningLeft
 local direction
@@ -274,8 +270,10 @@ function love.draw()
 
 	love.graphics.setColor(255, 255, 255, 255)
 	local budImageOriginX, budImageOriginY = budImage:getWidth() * .5, budImage:getHeight() * .2
-	love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier - .01 * gameOverBlendFactor, scaleMultiplier - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
-	if gameOver and not won then
+	local isBudDead = (gameOver and not won)
+	local budScale = (isBudDead and 1 or (1 + math.max(0, math.sin(math.pi * (elapsedTime * 2))) * 0.03))
+	love.graphics.draw(budImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier * budScale - .01 * gameOverBlendFactor, scaleMultiplier * budScale - .01 * gameOverBlendFactor, budImageOriginX, budImageOriginY)
+	if isBudDead then
 		love.graphics.setColor(255, 255, 255, 255 * gameOverBlendFactor)
 		love.graphics.draw(budDeadImage, positionHistory[1].x, positionHistory[1].y, 0, scaleMultiplier, scaleMultiplier, budImageOriginX, budImageOriginY)
 	end
@@ -335,8 +333,7 @@ function love.update(dt)
 	end
 	if (playing or (gameOver and won)) and finalMovementAmount < 1 then
 		local position = positionHistory[#positionHistory]
-		local speed = SPEED * (1 - finalMovementAmount)
-		speed = speed + STREAK_SPEED_INCREASE_FACTOR * winStreak
+		local speed = (SPEED + STREAK_SPEED_INCREASE_FACTOR * winStreak) * (1 - finalMovementAmount)
 
 		direction = vNorm(vAdd(direction, vMul(vRight(direction), (isTurningLeft and 1 or -1) * (TURN_AMOUNT * speed) * dt)))
 		position = vAdd(position, vMul(direction, speed * dt))
@@ -431,14 +428,12 @@ function reset(keepCurrentTargets)
 	local totalTargetDistance = 0
 	local lastPathPosition = startingPosition
 	local lastTargetIndex = nil
-	canonicalPathPositionList = {startingPosition}
 	for i = 1, TARGET_COUNT do
 		local index = closestUnvisitedTargetIndex(lastPathPosition, lastTargetIndex)
 		local targetPosition = targets[index].position
 		totalTargetDistance = totalTargetDistance + vDist(lastPathPosition, targetPosition)
 		lastPathPosition = targetPosition
 		targets[index].setupVisited = true
-		canonicalPathPositionList[#canonicalPathPositionList + 1] = lastPathPosition
 	end
 
 	local totalTravelTime = totalTargetDistance / SPEED
